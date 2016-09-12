@@ -25,8 +25,8 @@ defmodule Rondo.Server do
     Usir.Acceptor.new(Usir.Server, @formats, __MODULE__.Handler, %{handler: handler, handler_opts: opts})
   end
 
-  def authenticate(methods, timeout \\ :infinity) do
-
+  def authenticate(_methods, _timeout \\ :infinity) do
+    throw :not_implemented
   end
 
   def call(name, data, timeout \\ 5_000) do
@@ -49,7 +49,7 @@ defmodule Rondo.Server do
 
   defp send_message(message) do
     %{parent: parent, instance: instance} = Process.get(__MODULE__.INFO)
-    message = %{message | instance: instance}
+    message = %Rondo.Server.Application.Message{instance: instance, data: %{message | instance: instance}}
     send(parent, message)
     :ok
   end

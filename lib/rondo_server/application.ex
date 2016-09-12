@@ -171,9 +171,9 @@ defmodule Rondo.Server.Application do
   end
 
   defp render(app, store) do
-    #store = Rondo.State.Store.initialize(store)
+    store = Rondo.State.Store.initialize(store)
     {rendered, store} = Rondo.render(app, store)
-    #store = Rondo.State.Store.finalize(store)
+    store = Rondo.State.Store.finalize(store)
 
     diff = Rondo.diff(rendered, app) |> Enum.to_list
     {diff, rendered, store}

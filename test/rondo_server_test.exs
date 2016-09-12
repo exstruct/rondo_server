@@ -3,45 +3,6 @@ defmodule Test.Rondo.Server do
   alias __MODULE__.Client
   alias Usir.Message
 
-  defmodule Store do
-    defstruct [stores: %{}]
-
-    def new() do
-      %__MODULE__{}
-    end
-
-    defimpl Rondo.State.Store do
-      def mount(%{stores: stores} = store, %{props: initial, type: :ephemeral} = descriptor) do
-        stores = Map.put_new(stores, descriptor, initial)
-        {Map.get(stores, descriptor), %{store | stores: stores}}
-      end
-
-      def handle_info(store, _info) do
-        store
-      end
-
-      def handle_action(store, descriptor, update_fn) do
-        {prev, store} = mount(store, descriptor)
-        value = update_fn.(prev)
-        stores = Map.put(store.stores, descriptor, value)
-        {:ok, %{store | stores: stores}}
-      end
-
-      def encode(%{stores: stores}) do
-        stores
-        |> :erlang.term_to_binary()
-        |> Base.url_encode64()
-      end
-
-      def decode_into(store, bin) do
-        stores = bin
-        |> Base.url_decode64!()
-        |> :erlang.binary_to_term()
-        %{store | stores: stores}
-      end
-    end
-  end
-
   defmodule Hello do
     use Rondo.Component
 
@@ -81,6 +42,35 @@ defmodule Test.Rondo.Server do
     end
   end
 
+  defmodule UpdateAndSendInfo do
+    use Rondo.Action
+
+    def affordance(_) do
+      %{
+        "type" => "string"
+      }
+    end
+
+    def action(_, _, input) do
+      Rondo.Server.info("foo", %{"value" => input})
+      input
+    end
+  end
+
+  defmodule SendInfo do
+    use Rondo.Component
+
+    def state(_, _) do
+      %{
+        value: create_store(nil)
+      }
+    end
+
+    def render(%{value: value}) do
+      el("Form", %{on_submit: ref([:value]) |> action(UpdateAndSendInfo)}, [value])
+    end
+  end
+
   defmodule Handler do
     use Rondo.Server
 
@@ -89,7 +79,7 @@ defmodule Test.Rondo.Server do
     end
 
     def init(%{proto: true}) do
-      {:ok, Test.Rondo.Server.Store.new(), %{state: true}}
+      {:ok, Rondo.Test.Store.init(%{}), %{state: true}}
     end
 
     def route("/hello", props, _) do
@@ -98,9 +88,9 @@ defmodule Test.Rondo.Server do
     def route("/counter", props, _) do
       {:ok, el(Counter, props)}
     end
-    #def route("/send-info", props, _) do
-    #  {:ok, el()}
-    #end
+    def route("/send-info", props, _) do
+      {:ok, el(SendInfo, props)}
+    end
     def route(_, _, %{state: true}) do
       {:error, :not_found}
     end
@@ -195,15 +185,42 @@ defmodule Test.Rondo.Server do
     end)
   end
 
+  test "send info" do
+    start(fn(client) ->
+      [%Message.Server.Mounted{body: body}] =
+        mount(client, 1, "/send-info", %{})
+
+      [%{value: %{props: %{"on_submit" => %{ref: action_ref}}}} | _] = body
+
+      [%Message.Server.Info{name: "foo", data: %{"value" => "Hello!"}},
+       %Message.Server.ActionAcknowledged{},
+       %Message.Server.Mounted{}] =
+        action(client, 1, action_ref, "Hello!")
+    end)
+  end
+
   defp start(fun) do
     acceptor = Rondo.Server.acceptor(Handler, %{acceptor: true})
     {:ok, ref} = Usir.Transport.HTTP.Server.http(acceptor)
     {_, port} = :ranch.get_addr(ref)
     address = 'ws://localhost:#{port}'
     {:ok, client} = Client.connect(address)
-    fun.(client)
-    Client.close(client)
-    Usir.Transport.HTTP.Server.close(ref)
+    close = fn() ->
+      Client.close(client)
+      Usir.Transport.HTTP.Server.close(ref)
+    end
+    try do
+      fun.(client)
+      close.()
+    rescue
+      e ->
+        close.()
+        reraise e, System.stacktrace
+    catch
+      :throw, error ->
+        close.()
+        throw error
+    end
   end
 
   defp mount(client, instance, path, props \\ %{}, state \\ nil) do
