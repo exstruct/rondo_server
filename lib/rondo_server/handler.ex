@@ -71,7 +71,7 @@ defmodule Rondo.Server.Handler do
         {:ok, data, state}
     end
   end
-  def handle_info(%{instances: instances} = state, {:EXIT, pid, :normal}) do
+  def handle_info(%{instances: instances} = state, {:EXIT, pid, reason}) when reason in [:normal, :shutdown] do
     case Enum.find(instances, &(elem(&1, 1) == pid)) do
       {instance, _} ->
         {:noreply, %{state | instances: Map.delete(instances, instance)}}
