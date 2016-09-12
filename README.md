@@ -18,7 +18,7 @@ end
 
 Start by creating the rondo component we want to render:
 
-```
+```elixir
 defmodule MyApp.Hello do
   use Rondo.Component
 
@@ -30,7 +30,7 @@ end
 
 Next define a handler.
 
-```
+```elixir
 defmodule MyApp.Handler do
   use Rondo.Server
 
@@ -62,7 +62,7 @@ end
 
 Now we can create an acceptor from the handler and start a usir transport:
 
-```
+```elixir
 acceptor = Rondo.Server.acceptor(MyApp.Handler, %{})
 Usir.Transport.HTTP.Server.http(acceptor)
 ```
