@@ -129,6 +129,15 @@ defmodule Test.Rondo.Server do
     end)
   end
 
+  test "app error on mount" do
+    start(fn(client) ->
+      [%Message.Server.Error{}] =
+        mount(client, 1, "/hello", %{"nf" => "Joe"})
+      [%Message.Server.Mounted{body: [_]}] =
+        mount(client, 1, "/hello", %{"name" => "Robert"})
+    end)
+  end
+
   test "unmount" do
     start(fn(client) ->
       [%Message.Server.Mounted{}] =

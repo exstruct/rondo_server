@@ -5,6 +5,19 @@ defmodule Rondo.Server do
     quote do
       @behaviour Rondo.Server
       import Rondo.Element
+
+      case Mix.env do
+        :prod ->
+          def format_error(_, _, _) do
+            "Internal Server Error"
+          end
+        _ ->
+          def format_error(type, error, stacktrace) do
+            Exception.format(type, error, stacktrace)
+          end
+      end
+
+      defoverridable [format_error: 3]
     end
   end
 
@@ -20,6 +33,7 @@ defmodule Rondo.Server do
   defcallback init(opts :: any) :: {:ok, Rondo.State.Store.t, any} | {:error, reason :: term}
   defcallback route(path :: binary, props :: map, state :: any) :: {:ok, Rondo.Element.Mountable.t} | {:error, reason :: term}
   defcallback authenticate(method :: term, token :: binary, state :: any) :: {:ok, data :: term} | {:error, error :: term}
+  defcallback format_error(type :: atom, error :: term, stacktrace :: list) :: binary
 
   def acceptor(handler, opts \\ %{}) do
     Usir.Acceptor.new(Usir.Server, @formats, __MODULE__.Handler, %{handler: handler, handler_opts: opts})

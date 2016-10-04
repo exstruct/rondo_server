@@ -27,14 +27,22 @@ defmodule Rondo.Server.Application do
       Process.put(Rondo.Server.INFO, %{instance: instance, parent: parent})
       case handler.init(handler_opts) do
         {:ok, store, handler_state} ->
-          rec(rec, handler_state: handler_state, store: store, app: %Rondo.Application{})
-          |> handle_call({:mount, path, props, state_token})
-          |> maybe_reply()
-          |> __loop__()
+          {:mount, path, props, state_token}
+          |> init(rec, store, handler_state)
         {:error, error} ->
           maybe_raise(error)
       end
     end)
+  end
+
+  def init(call, rec, store, handler_state) do
+    rec(rec, handler_state: handler_state, store: store, app: %Rondo.Application{})
+    |> handle_call(call)
+    |> maybe_reply()
+    |> __loop__()
+  catch
+    type, error when type in [:error, :throw] ->
+      handle_error(rec, type, error, System.stacktrace)
   end
 
   def mount(pid, path, props, state) do
@@ -84,15 +92,17 @@ defmodule Rondo.Server.Application do
     end
   catch
     type, error when type in [:error, :throw] ->
-      stacktrace = System.stacktrace
+      handle_error(rec, type, error, System.stacktrace)
+  end
 
-      info = Exception.format(type, error, Enum.take(stacktrace, 1))
-      rec(path: path, instance: instance) = rec
+  defp handle_error(rec, type, error, stacktrace) do
+    rec(handler: handler, path: path, instance: instance) = rec
+    info = handler.format_error(type, error, stacktrace)
 
-      Logger.error(Exception.format(type, error, stacktrace))
+    Logger.error(Exception.format(type, error, stacktrace))
 
-      {:ok, %Server.Error{path: path, instance: instance, info: info}, rec}
-      |> maybe_reply()
+    {:ok, %Server.Error{path: path, instance: instance, info: info}, rec}
+    |> maybe_reply()
   end
 
   defp maybe_reply({:ok, data, rec(parent: parent, instance: instance) = rec}) do
