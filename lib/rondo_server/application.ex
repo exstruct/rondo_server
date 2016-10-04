@@ -11,6 +11,15 @@ defmodule Rondo.Server.Application do
 
   @call __MODULE__.CALL
 
+  def reload_all do
+    :erlang.processes()
+    |> Stream.filter(fn(pid) ->
+      {_, dict} = Process.info(pid, :dictionary)
+      !!dict[Rondo.Server.INFO]
+    end)
+    |> Enum.each(&call(&1, :reload))
+  end
+
   def new(handler, handler_opts, instance, path, props, state_token) do
     parent = self()
     rec = rec(handler: handler, parent: parent, instance: instance)
@@ -105,6 +114,7 @@ defmodule Rondo.Server.Application do
     case handler.route(path, props, handler_state) do
       {:ok, entry} ->
         rec
+        |> rec(path: path, props: props)
         |> put_entry(entry)
         |> init_store(state_token)
         |> mount()
@@ -143,6 +153,10 @@ defmodule Rondo.Server.Application do
     |> maybe_reply()
 
     exit(:normal)
+  end
+  defp handle_call(rec(path: path, props: props, state_token: state_token) = rec, :reload) do
+    msg = {:mount, path, props, state_token}
+    handle_call(rec(rec, app: %Rondo.Application{}), msg)
   end
 
   defp put_entry(rec(app: app) = rec, entry) do

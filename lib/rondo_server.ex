@@ -25,6 +25,10 @@ defmodule Rondo.Server do
     Usir.Acceptor.new(Usir.Server, @formats, __MODULE__.Handler, %{handler: handler, handler_opts: opts})
   end
 
+  def reload() do
+    Rondo.Server.Application.reload_all()
+  end
+
   def authenticate(_methods, _timeout \\ :infinity) do
     throw :not_implemented
   end
