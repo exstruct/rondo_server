@@ -3,7 +3,7 @@ defmodule RondoServer.Mixfile do
 
   def project do
     [app: :rondo_server,
-     version: "0.1.0",
+     version: "0.1.1",
      elixir: "~> 1.2",
      description: "Usir server for rondo applications",
      build_embedded: Mix.env == :prod,
