@@ -25,7 +25,7 @@ defmodule RondoServer.Mixfile do
 
   defp deps do
     [{:ex_json_schema, "~> 0.4.1"},
-     {:rondo, "~> 0.1.5"},
+     {:rondo, "~> 0.1.6"},
      {:usir, "~> 0.2.0"},
      {:msgpax, "~> 0.8"},
      {:mix_test_watch, "~> 0.2", only: :dev},

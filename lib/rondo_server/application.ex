@@ -144,6 +144,7 @@ defmodule Rondo.Server.Application do
         {:ok, %Server.ActionAcknowledged{instance: instance, ref: ref}, rec}
         |> maybe_reply()
         |> rec(app: app, store: store)
+        |> send_streams()
         |> mount()
         |> remove_noop()
       {:invalid, errors, app, store} ->
@@ -214,5 +215,15 @@ defmodule Rondo.Server.Application do
   defp mount_body(body, state_token, rec(instance: instance, path: path) = rec) do
     message = %Server.Mounted{instance: instance, path: path, body: body, state: state_token}
     {:ok, message, rec}
+  end
+
+  defp send_streams(rec(instance: instance, app: app) = rec) do
+    case Rondo.fetch_streams(app) do
+      streams when map_size(streams) > 0 ->
+        {:ok, %Server.Info{instance: instance, name: "_emit", data: streams}, rec}
+        |> maybe_reply()
+      _ ->
+        rec
+    end
   end
 end

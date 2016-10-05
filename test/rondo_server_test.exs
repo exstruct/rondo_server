@@ -11,21 +11,21 @@ defmodule Test.Rondo.Server do
     end
   end
 
-  defmodule Count do
-    use Rondo.Action
-
-    def affordance(_) do
-      %{
-        "type" => "number"
-      }
-    end
-
-    def action(_, prev, input) do
-      prev + input
-    end
-  end
-
   defmodule Counter do
+    defmodule Count do
+      use Rondo.Action
+
+      def affordance(_) do
+        %{
+          "type" => "number"
+        }
+      end
+
+      def action(_, prev, input) do
+        prev + input
+      end
+    end
+
     use Rondo.Component
 
     def state(_, _) do
@@ -42,22 +42,22 @@ defmodule Test.Rondo.Server do
     end
   end
 
-  defmodule UpdateAndSendInfo do
-    use Rondo.Action
-
-    def affordance(_) do
-      %{
-        "type" => "string"
-      }
-    end
-
-    def action(_, _, input) do
-      Rondo.Server.info("foo", %{"value" => input})
-      input
-    end
-  end
-
   defmodule SendInfo do
+    defmodule UpdateAndSendInfo do
+      use Rondo.Action
+
+      def affordance(_) do
+        %{
+          "type" => "string"
+        }
+      end
+
+      def action(_, _, input) do
+        Rondo.Server.info("foo", %{"value" => input})
+        input
+      end
+    end
+
     use Rondo.Component
 
     def state(_, _) do
@@ -68,6 +68,37 @@ defmodule Test.Rondo.Server do
 
     def render(%{value: value}) do
       el("Form", %{on_submit: ref([:value]) |> action(UpdateAndSendInfo)}, [value])
+    end
+  end
+
+  defmodule Stream do
+    defmodule SendEvent do
+      use Rondo.Action
+
+      def affordance(_) do
+        %{
+          "type" => "array"
+        }
+      end
+
+      def action(_, prev, input) do
+        Elixir.Stream.concat(prev, input)
+      end
+    end
+
+    use Rondo.Component
+
+    def state(_, _) do
+      %{
+        events: create_stream()
+      }
+    end
+
+    def render(%{events: events}) do
+      el("Form", %{
+        events: events,
+        on_submit: ref([:events]) |> action(SendEvent)
+      })
     end
   end
 
@@ -90,6 +121,9 @@ defmodule Test.Rondo.Server do
     end
     def route("/send-info", props, _) do
       {:ok, el(SendInfo, props)}
+    end
+    def route("/stream", props, _) do
+      {:ok, el(Stream, props)}
     end
     def route(_, _, %{state: true}) do
       {:error, :not_found}
@@ -205,6 +239,19 @@ defmodule Test.Rondo.Server do
        %Message.Server.ActionAcknowledged{},
        %Message.Server.Mounted{}] =
         action(client, 1, action_ref, "Hello!")
+    end)
+  end
+
+  test "streams" do
+    start(fn(client) ->
+      [%Message.Server.Mounted{body: body}] =
+        mount(client, 1, "/stream", %{})
+
+      [%{value: %{props: %{"on_submit" => %{ref: action_ref}}}} | _] = body
+
+      [%Message.Server.ActionAcknowledged{},
+       %Message.Server.Info{name: "_emit", data: _}] =
+        action(client, 1, action_ref, ["Hello", "World!"])
     end)
   end
 

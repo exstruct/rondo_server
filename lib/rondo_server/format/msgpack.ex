@@ -5,7 +5,9 @@ types = %{
   Rondo.Path => 32,
   Rondo.Operation.Remove => 35,
   Rondo.Operation.Replace => 36,
-  Rondo.Schema => 37
+  Rondo.Operation.Copy => 37,
+  Rondo.Schema => 38,
+  Rondo.Stream.Subscription => 39
 }
 
 defmodule Rondo.Server.Format.MSGPACK do
@@ -125,6 +127,17 @@ defimpl Msgpax.Packer, for: Rondo.Operation.Replace do
   end
 end
 
+defimpl Msgpax.Packer, for: Rondo.Operation.Copy do
+  def transform(%{from: from, to: to}) do
+    [from, to]
+    |> MSGPACK.__transform__(@for)
+  end
+
+  def unpack([from, to]) do
+    %@for{from: from, to: to}
+  end
+end
+
 defimpl Msgpax.Packer, for: Rondo.Schema do
   def transform(%{schema: schema}) do
     schema
@@ -133,5 +146,16 @@ defimpl Msgpax.Packer, for: Rondo.Schema do
 
   def unpack(schema) do
     %@for{schema: schema}
+  end
+end
+
+defimpl Msgpax.Packer, for: Rondo.Stream.Subscription do
+  def transform(%{id: id}) do
+    id
+    |> MSGPACK.__transform__(@for)
+  end
+
+  def unpack(id) do
+    %@for{id: id}
   end
 end
