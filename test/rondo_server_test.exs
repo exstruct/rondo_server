@@ -257,7 +257,7 @@ defmodule Test.Rondo.Server do
 
   defp start(fun) do
     acceptor = Rondo.Server.acceptor(Handler, %{acceptor: true})
-    {:ok, ref} = Usir.Transport.HTTP.Server.http(acceptor)
+    {:ok, ref} = Usir.Transport.HTTP.Server.http(acceptor, %{}, [port: 0])
     {_, port} = :ranch.get_addr(ref)
     address = 'ws://localhost:#{port}'
     {:ok, client} = Client.connect(address)
