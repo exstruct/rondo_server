@@ -3,11 +3,9 @@ types = %{
   Rondo.Component.Pointer => 34,
   Rondo.Element => 31,
   Rondo.Path => 32,
-  Rondo.Operation.Remove => 35,
-  Rondo.Operation.Replace => 36,
-  Rondo.Operation.Copy => 37,
-  Rondo.Schema => 38,
-  Rondo.Stream.Subscription => 39
+  Rondo.Patch => 35,
+  Rondo.Schema => 36,
+  Rondo.Stream.Subscription => 37
 }
 
 defmodule Rondo.Server.Format.MSGPACK do
@@ -105,36 +103,14 @@ defimpl Msgpax.Packer, for: Rondo.Path do
   end
 end
 
-defimpl Msgpax.Packer, for: Rondo.Operation.Remove do
-  def transform(%{path: path}) do
-    path
+defimpl Msgpax.Packer, for: Rondo.Patch do
+  def transform(%{doc: doc}) do
+    doc
     |> MSGPACK.__transform__(@for)
   end
 
-  def unpack(path) do
-    %@for{path: path}
-  end
-end
-
-defimpl Msgpax.Packer, for: Rondo.Operation.Replace do
-  def transform(%{path: path, value: value}) do
-    [value | path]
-    |> MSGPACK.__transform__(@for)
-  end
-
-  def unpack([value | path]) do
-    %@for{path: path, value: value}
-  end
-end
-
-defimpl Msgpax.Packer, for: Rondo.Operation.Copy do
-  def transform(%{from: from, to: to}) do
-    [from, to]
-    |> MSGPACK.__transform__(@for)
-  end
-
-  def unpack([from, to]) do
-    %@for{from: from, to: to}
+  def unpack(doc) do
+    %@for{doc: doc, empty?: map_size(doc) == 0}
   end
 end
 

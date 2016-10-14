@@ -3,6 +3,8 @@ defmodule Rondo.Server.Handler do
   alias Usir.Message.Server
   alias Rondo.Server.Application
 
+  require Logger
+
   def init(%{handler: handler, handler_opts: handler_opts}, protocol_info) do
     :erlang.process_flag(:trap_exit, true)
     {:ok, handler_opts} = handler.setup(handler_opts, protocol_info)
@@ -63,11 +65,28 @@ defmodule Rondo.Server.Handler do
     end
   end
 
-  def handle_info(%{instances: instances} = state, %Application.Message{instance: instance, data: data}) do
+  def handle_info(%{instances: instances} = state, %Application.Message{instance: instance, data: data, running_time: t}) do
     case Map.fetch(instances, instance) do
       :error ->
         {:noreply, state}
       {:ok, _} ->
+        Logger.debug(fn ->
+          t = format_time(t)
+          case data do
+            %Server.Mounted{path: path, body: body} ->
+              size = try do
+                body |> Msgpax.pack!() |> :erlang.iolist_size()
+              rescue
+                _ ->
+                  0
+              end
+              "MOUNT #{path} #{t} #{format_size(size)}"
+            %Server.ActionAcknowledged{ref: ref} ->
+              "ACTION <#{ref}> #{t}"
+            _ ->
+              nil
+          end
+        end)
         {:ok, data, state}
     end
   end
@@ -83,4 +102,10 @@ defmodule Rondo.Server.Handler do
     IO.inspect info
     {:noreply, state}
   end
+
+  defp format_time(time) when time > 1000, do: [time |> div(1000) |> Integer.to_string, "ms"]
+  defp format_time(time), do: [time |> Integer.to_string, "µs"]
+
+  defp format_size(b) when b > 1024, do: [b |> div(1000) |> Integer.to_string(), "kb"]
+  defp format_size(b), do: [b |> Integer.to_string, "b"]
 end

@@ -1,12 +1,14 @@
 defmodule Rondo.Server.Application do
   require Record
-  Record.defrecord :rec, [:handler, :handler_state, :parent, :instance, :path, :props, :state_token, :store, :app, :entry]
+  Record.defrecord :rec, [:handler, :handler_state, :parent, :instance, :path, :props, :state_token, :store, :app, :entry, :time]
   require Logger
 
   alias Usir.Message.Server
 
   defmodule Message do
-    defstruct [:instance, :data]
+    defstruct [:instance,
+               :data,
+               :running_time]
   end
 
   @call __MODULE__.CALL
@@ -22,7 +24,7 @@ defmodule Rondo.Server.Application do
 
   def new(handler, handler_opts, instance, path, props, state_token) do
     parent = self()
-    rec = rec(handler: handler, parent: parent, instance: instance)
+    rec = rec(handler: handler, parent: parent, instance: instance, time: now())
     spawn_link(fn ->
       Process.put(Rondo.Server.INFO, %{instance: instance, parent: parent})
       case handler.init(handler_opts) do
@@ -81,12 +83,13 @@ defmodule Rondo.Server.Application do
     receive do
       {@call, message} ->
         rec
+        |> rec(time: now())
         |> handle_call(message)
         |> maybe_reply()
       info ->
         store = Rondo.State.Store.handle_info(rec(rec, :store), info)
         rec
-        |> rec(store: store)
+        |> rec(store: store, time: now())
         |> mount()
         |> maybe_reply()
     end
@@ -105,12 +108,14 @@ defmodule Rondo.Server.Application do
     |> maybe_reply()
   end
 
-  defp maybe_reply({:ok, data, rec(parent: parent, instance: instance) = rec}) do
-    send(parent, %Message{instance: instance, data: data})
-    rec
+  defp maybe_reply({:ok, data, rec(parent: parent, instance: instance, time: time) = rec}) do
+    now = now()
+    rt = System.convert_time_unit(now - time, :native, :micro_seconds)
+    send(parent, %Message{instance: instance, data: data, running_time: rt})
+    rec(rec, time: now)
   end
   defp maybe_reply({:noreply, rec}) do
-    rec
+    rec(rec, time: now())
   end
 
   defp maybe_raise(%{__struct__: _} = error) do
@@ -200,12 +205,12 @@ defmodule Rondo.Server.Application do
     {rendered, store} = Rondo.render(app, store)
     store = Rondo.State.Store.finalize(store)
 
-    diff = Rondo.diff(rendered, app) |> Enum.to_list
+    diff = Rondo.diff(rendered, app)
     {diff, rendered, store}
   end
 
-  defp prepare_diff({[], app, store}, rec) do
-    mount_body([], rec(rec, :state_token), rec(rec, app: app, store: store))
+  defp prepare_diff({%{empty?: true} = diff, app, store}, rec) do
+    mount_body(diff, rec(rec, :state_token), rec(rec, app: app, store: store))
   end
   defp prepare_diff({diff, app, store}, rec) do
     token = Rondo.State.Store.encode(store)
@@ -225,5 +230,9 @@ defmodule Rondo.Server.Application do
       _ ->
         rec
     end
+  end
+
+  defp now() do
+    :erlang.monotonic_time()
   end
 end
