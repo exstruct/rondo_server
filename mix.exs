@@ -20,7 +20,12 @@ defmodule RondoServer.Mixfile do
   end
 
   def application do
-    [applications: [:logger]]
+    [applications: [
+      :ex_json_schema,
+      :logger,
+      :msgpax,
+      :usir
+    ]]
   end
 
   defp deps do
