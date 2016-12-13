@@ -14,8 +14,12 @@ defmodule Rondo.Server.Application do
   def reload_all do
     :erlang.processes()
     |> Stream.filter(fn(pid) ->
-      {_, dict} = Process.info(pid, :dictionary)
-      !!dict[Rondo.Server.INFO]
+      case Process.info(pid, :dictionary) do
+        {_, dict} ->
+          !!dict[Rondo.Server.INFO]
+        _ ->
+          false
+      end
     end)
     |> Enum.each(&call(&1, :reload))
   end
